@@ -28,6 +28,7 @@ from scipy import ndimage
 from IPython.core.debugger import set_trace
 from fastcore.all import *
 from fastprogress.fastprogress import progress_bar,master_bar
+from deconvolution.models.deconv import *
 
 try:
     from types import WrapperDescriptorType,MethodWrapperType,MethodDescriptorType

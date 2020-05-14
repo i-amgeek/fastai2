@@ -1,0 +1,3 @@
+[submodule "fastai2/deconvolution"]
+	path = fastai2/deconvolution
+	url = https://github.com/yechengxi/deconvolution/

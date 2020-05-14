@@ -230,13 +230,16 @@ defaults.activation=nn.ReLU
 class ConvLayer(nn.Sequential):
     "Create a sequence of convolutional (`ni` to `nf`), ReLU (if `use_activ`) and `norm_type` layers."
     def __init__(self, ni, nf, ks=3, stride=1, padding=None, bias=None, ndim=2, norm_type=NormType.Batch, bn_1st=True,
-                 act_cls=defaults.activation, transpose=False, init='auto', xtra=None, bias_std=0.01, **kwargs):
+                 act_cls=defaults.activation, transpose=False, init='auto', xtra=None, bias_std=0.01, deconv=None, sym=None, pool=None, pool_first=None, **kwargs):
         if padding is None: padding = ((ks-1)//2 if not transpose else 0)
         bn = norm_type in (NormType.Batch, NormType.BatchZero)
         inn = norm_type in (NormType.Instance, NormType.InstanceZero)
         if bias is None: bias = not (bn or inn)
-        conv_func = _conv_func(ndim, transpose=transpose)
-        conv = conv_func(ni, nf, kernel_size=ks, bias=bias, stride=stride, padding=padding, **kwargs)
+        if not deconv:
+            conv_func = _conv_func(ndim, transpose=transpose)
+        else:
+            conv_func = partial(FastDeconv, sampling_stride=stride)
+        conv = conv_func(ni, nf, kernel_size=ks, stride=stride, padding=padding, **kwargs)
         act = None if act_cls is None else act_cls()
         init_linear(conv, act, init=init, bias_std=bias_std)
         if   norm_type==NormType.Weight:   conv = weight_norm(conv)
@@ -244,9 +247,9 @@ class ConvLayer(nn.Sequential):
         layers = [conv]
         act_bn = []
         if act is not None: act_bn.append(act)
-        if bn: act_bn.append(BatchNorm(nf, norm_type=norm_type, ndim=ndim))
+        if bn and not deconv: act_bn.append(BatchNorm(nf, norm_type=norm_type, ndim=ndim))
         if inn: act_bn.append(InstanceNorm(nf, norm_type=norm_type, ndim=ndim))
-        if bn_1st: act_bn.reverse()
+        if bn_1st and not deconv: act_bn.reverse()
         layers += act_bn
         if xtra: layers.append(xtra)
         super().__init__(*layers)
@@ -565,7 +568,7 @@ def SEBlock(expansion, ni, nf, groups=1, reduction=16, stride=1, **kwargs):
 # Cell
 def SEResNeXtBlock(expansion, ni, nf, groups=32, reduction=16, stride=1, base_width=4, **kwargs):
     w = math.floor(nf * (base_width / 64)) * groups
-    return ResBlock(expansion, ni, nf, stride=stride, groups=groups, reduction=reduction, nh2=w, **kwargs)
+    return ResBlock(expansion, ni, nf, stride=stride, groups=groups, reduction=reduction, nh2=w,  **kwargs)
 
 # Cell
 def SeparableBlock(expansion, ni, nf, reduction=16, stride=1, base_width=4, **kwargs):
